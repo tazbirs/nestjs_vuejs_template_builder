@@ -38,7 +38,12 @@ export class TemplatesController {
     @Param('id') id: string,
     @Body() updateTemplateDto: UpdateTemplateDto,
   ): Promise<Template | null> {
-    return this.templatesService.update(id, updateTemplateDto);
+    try {
+      return await this.templatesService.update(id, updateTemplateDto);
+    } catch (error) {
+      console.error(`Error updating template ${id}:`, error);
+      throw error;
+    }
   }
 
   @Delete(':id')

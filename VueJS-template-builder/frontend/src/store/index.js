@@ -1,7 +1,7 @@
 import { createStore } from 'vuex'
 import axios from 'axios'
 
-const API_URL = 'http://localhost:3000/api'
+const API_URL = 'http://localhost:3002/api'
 
 export default createStore({
   state: {
@@ -96,31 +96,87 @@ export default createStore({
     async createTemplate({ commit }, template) {
       commit('SET_LOADING', true)
       try {
-        const response = await axios.post(`${API_URL}/templates`, template)
-        commit('ADD_TEMPLATE', response.data)
-        commit('SET_ERROR', null)
-        return response.data
+        // Clean the template data to meet backend expectations
+        const cleanTemplate = { ...template };
+        
+        // Clean nested properties that might cause validation issues
+        if (cleanTemplate.elements) {
+          cleanTemplate.elements = cleanTemplate.elements.map(element => {
+            const cleanElement = { ...element };
+            
+            // Fix any null or undefined values that should be excluded
+            if (cleanElement.validation) {
+              Object.keys(cleanElement.validation).forEach(key => {
+                if (cleanElement.validation[key] === null || cleanElement.validation[key] === undefined) {
+                  delete cleanElement.validation[key];
+                }
+              });
+            }
+            
+            return cleanElement;
+          });
+        }
+        
+        console.log('Creating template:', cleanTemplate);
+        const response = await axios.post(`${API_URL}/templates`, cleanTemplate);
+        commit('ADD_TEMPLATE', response.data);
+        commit('SET_ERROR', null);
+        return response.data;
       } catch (error) {
-        commit('SET_ERROR', error.message || 'Failed to create template')
-        console.error('Error creating template:', error)
-        throw error
+        commit('SET_ERROR', error.message || 'Failed to create template');
+        console.error('Error creating template:', error);
+        if (error.response) {
+          console.error('Server response:', error.response.data);
+        }
+        throw error;
       } finally {
-        commit('SET_LOADING', false)
+        commit('SET_LOADING', false);
       }
     },
     async updateTemplate({ commit }, template) {
       commit('SET_LOADING', true)
       try {
-        const response = await axios.put(`${API_URL}/templates/${template._id}`, template)
-        commit('UPDATE_TEMPLATE', response.data)
-        commit('SET_ERROR', null)
-        return response.data
+        // Ensure the _id exists and is properly formatted
+        if (!template._id) {
+          throw new Error('Template ID is missing')
+        }
+        
+        // Clean the template data to meet backend expectations
+        const cleanTemplate = { ...template };
+        
+        // Clean nested properties that might cause validation issues
+        if (cleanTemplate.elements) {
+          cleanTemplate.elements = cleanTemplate.elements.map(element => {
+            const cleanElement = { ...element };
+            
+            // Fix any null or undefined values that should be excluded
+            if (cleanElement.validation) {
+              Object.keys(cleanElement.validation).forEach(key => {
+                if (cleanElement.validation[key] === null || cleanElement.validation[key] === undefined) {
+                  delete cleanElement.validation[key];
+                }
+              });
+            }
+            
+            return cleanElement;
+          });
+        }
+        
+        console.log('Updating template with ID:', template._id);
+        const response = await axios.put(`${API_URL}/templates/${template._id}`, cleanTemplate);
+        commit('UPDATE_TEMPLATE', response.data);
+        commit('SET_CURRENT_TEMPLATE', response.data); // Also update current template
+        commit('SET_ERROR', null);
+        return response.data;
       } catch (error) {
-        commit('SET_ERROR', error.message || 'Failed to update template')
-        console.error('Error updating template:', error)
-        throw error
+        commit('SET_ERROR', error.message || 'Failed to update template');
+        console.error('Error updating template:', error);
+        if (error.response) {
+          console.error('Server response:', error.response.data);
+        }
+        throw error;
       } finally {
-        commit('SET_LOADING', false)
+        commit('SET_LOADING', false);
       }
     },
     async deleteTemplate({ commit }, templateId) {
@@ -184,8 +240,15 @@ export default createStore({
     async updateForm({ commit }, form) {
       commit('SET_LOADING', true)
       try {
+        // Ensure the _id exists and is properly formatted
+        if (!form._id) {
+          throw new Error('Form ID is missing')
+        }
+        
+        console.log('Updating form with ID:', form._id)
         const response = await axios.put(`${API_URL}/forms/${form._id}`, form)
         commit('UPDATE_FORM', response.data)
+        commit('SET_CURRENT_FORM', response.data) // Also update current form
         commit('SET_ERROR', null)
         return response.data
       } catch (error) {

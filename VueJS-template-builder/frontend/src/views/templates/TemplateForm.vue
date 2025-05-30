@@ -63,27 +63,44 @@
             @dragenter.prevent
           >
             <template v-if="template.elements && template.elements.length > 0">
-              <div
-                v-for="(element, index) in template.elements"
-                :key="index"
-                class="form-element"
+              <draggable 
+                v-model="template.elements" 
+                item-key="id" 
+                handle=".element-drag-handle"
+                ghost-class="ghost-element"
+                @start="dragStart"
+                @end="dragEnd"
               >
-                <div class="element-header">
-                  <span>{{ element.label }}</span>
-                  <div class="element-actions">
-                    <el-button size="small" @click="editElement(index)">Edit</el-button>
-                    <el-button size="small" type="danger" @click="removeElement(index)">Remove</el-button>
+                <template #item="{element, index}">
+                  <div class="form-element">
+                    <div class="element-header">
+                      <div class="element-title">
+                        <el-button 
+                          class="element-drag-handle" 
+                          size="small" 
+                          icon="el-icon-rank"
+                          text
+                        >
+                          <el-icon><Rank /></el-icon>
+                        </el-button>
+                        <span>{{ element.label }}</span>
+                      </div>
+                      <div class="element-actions">
+                        <el-button size="small" @click="editElement(index)">Edit</el-button>
+                        <el-button size="small" type="danger" @click="removeElement(index)">Remove</el-button>
+                      </div>
+                    </div>
+                    
+                    <div class="element-preview">
+                      <component 
+                        :is="getElementComponent()"
+                        v-bind="element"
+                        disabled
+                      />
+                    </div>
                   </div>
-                </div>
-                
-                <div class="element-preview">
-                  <component 
-                    :is="getElementComponent()"
-                    v-bind="element"
-                    disabled
-                  />
-                </div>
-              </div>
+                </template>
+              </draggable>
             </template>
             
             <div v-else class="empty-form">
@@ -151,9 +168,15 @@ import { useStore } from 'vuex'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { v4 as uuidv4 } from 'uuid'
+import { Rank } from '@element-plus/icons-vue'
+import draggable from 'vuedraggable'
 
 export default {
   name: 'TemplateForm',
+  components: {
+    Rank,
+    draggable
+  },
   props: {
     id: {
       type: String,
@@ -187,16 +210,20 @@ export default {
       { type: 'number', label: 'Number' },
       { type: 'email', label: 'Email' },
       { type: 'password', label: 'Password' },
+      { type: 'mobile', label: 'Mobile Number' },
       { type: 'select', label: 'Dropdown' },
       { type: 'radio', label: 'Radio Buttons' },
       { type: 'checkbox', label: 'Checkboxes' },
       { type: 'date', label: 'Date Picker' },
+      { type: 'date-range', label: 'Date Range Picker' },
       { type: 'time', label: 'Time Picker' },
       { type: 'file', label: 'File Upload' },
       { type: 'slider', label: 'Slider' },
       { type: 'switch', label: 'Switch' },
       { type: 'divider', label: 'Divider' },
-      { type: 'heading', label: 'Heading' }
+      { type: 'heading', label: 'Heading' },
+      { type: 'image', label: 'Image' },
+      { type: 'header', label: 'Form Header' }
     ]
     
     onMounted(async () => {
@@ -239,6 +266,21 @@ export default {
         isEditingElement.value = false
         elementDialogVisible.value = true
       }
+    }
+    
+    // For draggable reordering
+    const dragStart = (event) => {
+      // Add styling when starting to drag an element
+      event.item.classList.add('element-being-dragged')
+    }
+    
+    const dragEnd = (event) => {
+      // Remove styling when drag ends
+      event.item.classList.remove('element-being-dragged')
+      // Update order property of elements if needed 
+      template.elements.forEach((element, index) => {
+        element.order = index
+      })
     }
     
     const editElement = (index) => {
@@ -292,16 +334,67 @@ export default {
       }
       
       try {
-        if (isEdit.value) {
-          await store.dispatch('updateTemplate', template)
-          ElMessage.success('Template updated successfully')
+        // Make sure all elements have IDs and order properties
+        template.elements.forEach((element, index) => {
+          if (!element.id) {
+            element.id = uuidv4()
+          }
+          element.order = index
+          
+          // Clean up the validation object to remove undefined properties
+          if (element.validation) {
+            Object.keys(element.validation).forEach(key => {
+              if (element.validation[key] === undefined) {
+                delete element.validation[key];
+              }
+            });
+          }
+          
+          // Ensure date objects are properly formatted as strings
+          if (element.validation && element.validation.minDate && element.validation.minDate instanceof Date) {
+            element.validation.minDate = element.validation.minDate.toISOString().split('T')[0];
+          }
+          if (element.validation && element.validation.maxDate && element.validation.maxDate instanceof Date) {
+            element.validation.maxDate = element.validation.maxDate.toISOString().split('T')[0];
+          }
+          
+          // Make sure options are properly formatted
+          if (element.options) {
+            element.options = element.options.map(option => ({
+              label: option.label || '',
+              value: option.value || ''
+            }));
+          }
+        });
+        
+        // Create a clean copy to avoid reactivity issues
+        const templateToSave = JSON.parse(JSON.stringify(template));
+        
+        // Remove extra Mongoose properties that might cause issues
+        if (isEdit.value && templateToSave._id) {
+          delete templateToSave.__v;
+          delete templateToSave.createdAt;
+          delete templateToSave.updatedAt;
+          
+          // Debug what we're sending to the server
+          console.log('Updating template:', templateToSave);
+          
+          await store.dispatch('updateTemplate', templateToSave);
+          ElMessage.success('Template updated successfully');
         } else {
-          const newTemplate = await store.dispatch('createTemplate', template)
-          ElMessage.success('Template created successfully')
-          router.push(`/templates/${newTemplate._id}`)
+          console.log('Creating template:', templateToSave);
+          const newTemplate = await store.dispatch('createTemplate', templateToSave);
+          ElMessage.success('Template created successfully');
+          router.push(`/templates/${newTemplate._id}`);
         }
       } catch (error) {
-        ElMessage.error(`Failed to ${isEdit.value ? 'update' : 'create'} template`)
+        console.error('Template save error:', error);
+        if (error.response && error.response.data) {
+          console.error('Server error details:', error.response.data);
+          ElMessage.error(`Failed to ${isEdit.value ? 'update' : 'create'} template: ${error.response.data.message || error.message}`);
+        } else {
+          ElMessage.error(`Failed to ${isEdit.value ? 'update' : 'create'} template: ${error.message}`);
+        }
       }
     }
     
@@ -321,6 +414,8 @@ export default {
       currentElement,
       onDragStart,
       onDrop,
+      dragStart,
+      dragEnd,
       editElement,
       removeElement,
       addOption,
@@ -381,6 +476,33 @@ export default {
   margin-bottom: 1rem;
   padding: 1rem;
   background-color: #f5f7fa;
+  transition: all 0.2s ease;
+}
+
+.element-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.element-drag-handle {
+  cursor: move;
+  color: #909399;
+}
+
+.element-drag-handle:hover {
+  color: #409EFF;
+}
+
+.ghost-element {
+  opacity: 0.5;
+  background: #c8ebfb;
+  border: 1px dashed #409EFF;
+}
+
+.element-being-dragged {
+  transform: rotate(1deg);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
 }
 
 .element-header {

@@ -7,9 +7,14 @@ export class FormElementValidation {
   required?: boolean;
   minLength?: number;
   maxLength?: number;
-  pattern?: string;
+  pattern?: string; // For regex validation
+  patternDescription?: string; // Description of the pattern for user feedback
   min?: number;
   max?: number;
+  minDate?: Date | string; // Minimum date for date validation
+  maxDate?: Date | string; // Maximum date for date validation
+  dateRangeEnabled?: boolean; // Enable date range selection
+  mobileNumberFormat?: string; // Format for mobile number validation
   options?: string[];
 }
 
@@ -27,11 +32,11 @@ export class FormElementStyle {
 
 export class FormElement {
   id: string;
-  type: string; // text, textarea, select, checkbox, radio, date, etc.
+  type: string; // text, textarea, select, checkbox, radio, date, date-range, mobile, etc.
   label: string;
   name: string;
   placeholder?: string;
-  defaultValue?: string;
+  defaultValue?: string | string[]; // Can be array for date range
   helperText?: string;
   validation?: FormElementValidation;
   style?: FormElementStyle;
@@ -42,6 +47,11 @@ export class FormElement {
   y?: number; // For drag and drop positioning
   width?: number; // For responsive layouts
   height?: number;
+  
+  // Additional fields for specific element types
+  image?: string; // For image and header elements
+  startPlaceholder?: string; // For date-range elements
+  endPlaceholder?: string; // For date-range elements
 }
 
 @Schema({ timestamps: true })

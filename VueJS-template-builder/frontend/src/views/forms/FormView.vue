@@ -86,6 +86,19 @@
                   v-model="formValues[element.name]"
                   controls-position="right"
                   style="width: 100%"
+                  :min="element.validation?.min"
+                  :max="element.validation?.max"
+                />
+                
+                <!-- Mobile Number Input -->
+                <el-input 
+                  v-else-if="element.type === 'mobile'"
+                  v-model="formValues[element.name]"
+                  :placeholder="element.placeholder || 'Enter mobile number'"
+                  type="tel"
+                  :maxlength="element.validation?.maxLength"
+                  :minlength="element.validation?.minLength"
+                  :validator="getMobileValidator(element)"
                 />
                 
                 <!-- Select -->
@@ -132,6 +145,20 @@
                   type="date"
                   :placeholder="element.placeholder || 'Select date'"
                   style="width: 100%"
+                  :disabled-date="getDateValidator(element)"
+                />
+                
+                <!-- Date Range Picker -->
+                <el-date-picker
+                  v-else-if="element.type === 'date-range'"
+                  v-model="formValues[element.name]"
+                  type="daterange"
+                  range-separator="To"
+                  :start-placeholder="element.startPlaceholder || 'Start date'"
+                  :end-placeholder="element.endPlaceholder || 'End date'"
+                  value-format="yyyy-MM-dd"
+                  style="width: 100%"
+                  :disabled-date="getDateValidator(element)"
                 />
                 
                 <!-- Time Picker -->
@@ -163,6 +190,20 @@
                 
                 <!-- Divider -->
                 <el-divider v-else-if="element.type === 'divider'" />
+                
+                <!-- Form Header -->
+                <div v-else-if="element.type === 'header'" class="form-header-view">
+                  <h2>{{ element.label || 'Form Header' }}</h2>
+                  <div v-if="element.image" class="header-image">
+                    <el-image :src="element.image" fit="contain" style="height: 60px; max-width: 200px;"></el-image>
+                  </div>
+                </div>
+                
+                <!-- Image -->
+                <div v-else-if="element.type === 'image'" class="form-image-view">
+                  <el-image v-if="element.image" :src="element.image" fit="contain" style="max-width: 100%;"></el-image>
+                  <div v-else class="image-placeholder">Image placeholder</div>
+                </div>
                 
                 <!-- Default case -->
                 <div v-else>{{ element.type }} element</div>
@@ -245,7 +286,66 @@ export default {
         case 'switch': return false
         case 'slider': return 0
         case 'file': return []
+        case 'date-range': return null // Default value for date range should be null
         default: return ''
+      }
+    }
+    
+    // Date validation function
+    const getDateValidator = (element) => {
+      return (date) => {
+        if (!element.validation) return false
+        
+        const minDate = element.validation.minDate ? new Date(element.validation.minDate) : null
+        const maxDate = element.validation.maxDate ? new Date(element.validation.maxDate) : null
+        
+        if (minDate && date < minDate) return true
+        if (maxDate && date > maxDate) return true
+        
+        return false
+      }
+    }
+    
+    // Mobile number validation function
+    const getMobileValidator = (element) => {
+      return (rule, value, callback) => {
+        if (!element.validation || !value) {
+          callback()
+          return
+        }
+        
+        let pattern
+        switch (element.validation.mobileNumberFormat) {
+          case 'international':
+            pattern = /^\+[1-9]\d{1,14}$/
+            break
+          case 'us':
+            pattern = /^(\+?1)?[-.\s]?\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}$/
+            break
+          case 'uk':
+            pattern = /^(\+?44|0)[-.\s]?\d{2,4}[-.\s]?\d{3}[-.\s]?\d{3,4}$/
+            break
+          case 'custom':
+            if (element.validation.pattern) {
+              try {
+                pattern = new RegExp(element.validation.pattern)
+              } catch (e) {
+                callback(new Error('Invalid custom pattern'))
+                return
+              }
+            }
+            break
+          default:
+            // Simple default pattern
+            pattern = /^\d{7,15}$/
+        }
+        
+        if (pattern && !pattern.test(value)) {
+          const errorMessage = element.validation.patternDescription || 'Invalid mobile number format'
+          callback(new Error(errorMessage))
+        } else {
+          callback()
+        }
       }
     }
     
@@ -261,8 +361,13 @@ export default {
     watch(form, (newForm) => {
       if (newForm && newForm.elements) {
         newForm.elements.forEach(element => {
-          if (element.type !== 'divider' && element.type !== 'heading') {
-            formValues[element.name] = element.defaultValue || getDefaultValueForType(element.type)
+          if (element.type !== 'divider' && element.type !== 'heading' && element.type !== 'header' && element.type !== 'image') {
+            if (element.type === 'date-range') {
+              // For date range, we need special handling
+              formValues[element.name] = element.defaultValue || null
+            } else {
+              formValues[element.name] = element.defaultValue || getDefaultValueForType(element.type)
+            }
           }
         })
       }
@@ -296,7 +401,9 @@ export default {
       formValues,
       submitForm,
       resetForm,
-      submissionDialogVisible
+      submissionDialogVisible,
+      getDateValidator,
+      getMobileValidator
     }
   }
 }
@@ -339,5 +446,49 @@ export default {
   display: flex;
   justify-content: flex-end;
   gap: 1rem;
+}
+
+.form-header-view {
+  padding: 15px 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+}
+
+.header-image {
+  text-align: center;
+}
+
+.image-view {
+  display: flex;
+  justify-content: center;
+  padding: 10px 0;
+}
+
+.image-placeholder {
+  background-color: #f5f7fa;
+  border: 1px dashed #dcdfe6;
+  height: 100px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  color: #909399;
+}
+
+.form-image-view {
+  margin: 10px 0;
+  text-align: center;
+}
+
+.form-image-view .image-placeholder {
+  width: 100%;
+  height: auto;
+  padding: 10px;
+  background-color: #f5f7fa;
+  border: 1px dashed #dcdfe6;
+  border-radius: 4px;
+  color: #909399;
+  text-align: center;
 }
 </style>
