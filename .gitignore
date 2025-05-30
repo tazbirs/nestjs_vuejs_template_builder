@@ -1,0 +1,3 @@
+# Project exclude paths
+/VueJS-template-builder/backend/dist/
+/VueJS-template-builder/frontend/dist/

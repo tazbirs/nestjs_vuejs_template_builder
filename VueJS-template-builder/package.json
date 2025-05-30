@@ -1,0 +1,32 @@
+{
+  "name": "vue-template-builder",
+  "version": "1.0.0",
+  "description": "Form Template Builder with Vue.js frontend and Nest.js backend",
+  "main": "index.js",
+  "scripts": {
+    "start": "concurrently \"npm run start:backend\" \"npm run start:frontend\"",
+    "start:backend": "cd backend && npm run start:dev",
+    "start:frontend": "cd frontend && npm run serve",
+    "install:all": "npm install && cd backend && npm install && cd ../frontend && npm install",
+    "build": "npm run build:backend && npm run build:frontend",
+    "build:backend": "cd backend && npm run build",
+    "build:frontend": "cd frontend && npm run build",
+    "docker:up": "docker-compose up -d",
+    "docker:down": "docker-compose down",
+    "docker:start": "npm run docker:up && npm run start",
+    "docker:logs": "docker-compose logs -f mongodb"
+  },
+  "keywords": [
+    "vue",
+    "nestjs",
+    "form",
+    "builder",
+    "template"
+  ],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "concurrently": "^7.6.0",
+    "uuid": "^9.0.0"
+  }
+}
